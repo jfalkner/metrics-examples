@@ -1,8 +1,13 @@
 package falkner.jayson.metrics.example
 
 import java.nio.file.{Files, Path}
+
 import falkner.jayson.metrics.{Metric, Metrics, Num, Str}
 import spray.json._
+import MetricWithVersions.strip
+
+import scala.util.{Failure, Success, Try}
+
 
 /**
   * Example of how to version a metric
@@ -21,23 +26,32 @@ object MetricWithVersions {
   // match build.sbt for your metrics module
   lazy val version = "0.0.1"
 
-  def apply(p: Path): Metrics = null
+  def apply(p: Path): Metrics = Try(strip(new String(Files.readAllBytes(p)).parseJson.asJsObject.fields("Version"))) match {
+    case Success(v) => v match {
+      case MetricWithVersions_1_2_3.version => MetricWithVersions_1_2_3(p)
+      case MetricWithVersions_1_3_0.version => MetricWithVersions_1_3_0(p)
+      // also practical to fallback to latest version here, if it that is preferred to having an exception raised
+      case _ => throw new Exception(s"Unknown version: $v")
+    }
+    case Failure(t) => throw new Exception(s"Can't parse version: $p")
+  }
+
+  def strip(jsv: JsValue): String = jsv.toString.stripPrefix("\"").stripSuffix("\"")
 }
 
 // example version 0.0.1
 object MetricWithVersions_1_2_3 {
   def apply(p: Path): MetricWithVersions_1_2_3 = new MetricWithVersions_1_2_3(p)
+  lazy val version = "1.2.3"
 }
 
 class MetricWithVersions_1_2_3(p: Path) extends Metrics {
   override lazy val namespace = "MWV"
-  override lazy val version = "1.2.3"
-
-  def removeQuotes(s: String): String = s.stripPrefix("\"").stripSuffix("\"")
+  override lazy val version = MetricWithVersions_1_2_3.version
 
   lazy val json = new String(Files.readAllBytes(p)).parseJson.asJsObject
 
-  lazy val m = json.fields.map{case (k, v) => removeQuotes(k) -> removeQuotes(v.toString())}
+  lazy val m = json.fields.map{case (k, v) => strip(k) -> strip(v)}
 
   override lazy val values = List[Metric](
     // suggested conventions from https://github.com/jfalkner/metrics#versioning-and-caching
@@ -52,11 +66,12 @@ class MetricWithVersions_1_2_3(p: Path) extends Metrics {
 // example version 0.1.0 -- major change since this would break older CSV exports
 object MetricWithVersions_1_3_0 {
   def apply(p: Path): MetricWithVersions_1_3_0 = new MetricWithVersions_1_3_0(p)
+  lazy val version = "1.3.0"
 }
 
 class MetricWithVersions_1_3_0(p: Path) extends Metrics {
   override lazy val namespace = "MWV"
-  override lazy val version = "1.3.0"
+  override lazy val version = MetricWithVersions_1_3_0.version
 
   def removeQuotes(s:String): String = s.stripPrefix("\"").stripSuffix("\"")
 
