@@ -26,6 +26,8 @@ object MetricWithVersions {
   // match build.sbt for your metrics module
   lazy val version = "0.0.1"
 
+  lazy val blank = MetricWithVersions_1_3_0(null)
+
   def apply(p: Path): Metrics = Try(strip(new String(Files.readAllBytes(p)).parseJson.asJsObject.fields("Version"))) match {
     case Success(v) => v match {
       case MetricWithVersions_1_2_3.version => MetricWithVersions_1_2_3(p)
